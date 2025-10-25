@@ -12,7 +12,10 @@ import {
   TiltData
 } from '@/types/sensor-data';
 
-const MQTT_BROKER = 'ws://47.84.93.46:1884'; // WebSocket port
+const MQTT_BROKER = process.env.NODE_ENV === 'production'
+  ? 'wss://broker.iot.hmmitb.com:8884'
+  : 'ws://47.84.93.46:1884';
+
 const TOPICS = {
   TEMP_1: 'ppr/temp/t1',
   TEMP_2: 'ppr/temp/t2',

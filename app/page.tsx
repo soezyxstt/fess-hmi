@@ -28,10 +28,10 @@ export default function Home() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold">FESS Monitoring System</h1>
+              <h1 className="text-2xl font-bold">Eoncore FESS Monitoring System</h1>
               <p className="text-sm text-muted-foreground">Real-time HMI Dashboard</p>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 max-sm:flex-col">
               <div className="text-right text-sm">
                 <p className="text-muted-foreground">Current Time</p>
                 <p className="font-mono">{new Date().toLocaleTimeString()}</p>
@@ -44,9 +44,9 @@ export default function Home() {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-x-0 gap-6 lg:gap-x-6">
           {/* Left Column */}
-          <div className="space-y-6">
+          <div className="space-y-6 w-full">
             <TemperatureCard data={temperatureData} />
             <PowerCard data={powerData} />
           </div>

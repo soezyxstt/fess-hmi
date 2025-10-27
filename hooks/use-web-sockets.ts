@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
-import mqtt, { MqttClient } from 'mqtt';
 import { 
   TemperatureData, 
   PowerData, 
@@ -12,10 +11,6 @@ import {
   TiltData
 } from '@/types/sensor-data';
 
-const MQTT_BROKER = process.env.NODE_ENV === 'production'
-  ? 'wss://broker.iot.hmmitb.com:8884'
-  : 'ws://broker.iot.hmmitb.com:1884';
-
 const TOPICS = {
   TEMP_1: 'ppr/temp/t1',
   TEMP_2: 'ppr/temp/t2',
@@ -25,7 +20,7 @@ const TOPICS = {
   TILT: 'ppr/tilt/angle',
 };
 
-export function useMQTT() {
+export function useWebSocket(esp32IP: string) {
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>({
     connected: false,
     connecting: false,
@@ -33,28 +28,23 @@ export function useMQTT() {
   });
 
   const [tiltData, setTiltData] = useState<TiltData | null>(null);
-
   const [temperatureData, setTemperatureData] = useState<TemperatureData>({
     t1: 0,
     t2: 0,
     t3: 0,
     timestamp: 0,
   });
-
   const [powerData, setPowerData] = useState<PowerData>({
     voltage: 0,
     current: 0,
     power: 0,
     timestamp: 0,
   });
-
   const [fftData, setFFTData] = useState<FFTData | null>(null);
-
   const [energyData, setEnergyData] = useState<EnergyData>({
     totalEnergy: 0,
     lastUpdate: 0,
   });
-
   const [systemStats, setSystemStats] = useState<SystemStats>({
     messagesReceived: 0,
     fftUpdates: 0,
@@ -62,14 +52,14 @@ export function useMQTT() {
     lastMessageTime: 0,
   });
 
-  const clientRef = useRef<MqttClient | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
   const connectionTimeRef = useRef<number>(0);
   const uptimeIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Initialize timestamps on mount to avoid calling Date.now() during render
+  // Initialize timestamps
   useEffect(() => {
     const now = Date.now();
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTemperatureData(prev => ({ ...prev, timestamp: now }));
     setPowerData(prev => ({ ...prev, timestamp: now }));
     setEnergyData(prev => ({ ...prev, lastUpdate: now }));
@@ -78,22 +68,17 @@ export function useMQTT() {
 
   // Energy calculation
   useEffect(() => {
-    if (powerData.power > 0 && powerData.timestamp > 0) {
+    if (powerData.power > 0) {
       const now = Date.now();
       const timeDiffHours = (now - energyData.lastUpdate) / (1000 * 3600);
-      
-      // Only update if time difference is reasonable (< 1 hour to avoid spikes)
-      if (timeDiffHours > 0 && timeDiffHours < 1) {
-        const energyIncrement = (powerData.power / 1000) * timeDiffHours;
-        
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setEnergyData(prev => ({
-          totalEnergy: prev.totalEnergy + energyIncrement,
-          lastUpdate: now,
-        }));
-      }
+      const energyIncrement = (powerData.power / 1000) * timeDiffHours;
+
+      setEnergyData(prev => ({
+        totalEnergy: prev.totalEnergy + energyIncrement,
+        lastUpdate: now,
+      }));
     }
-  }, [powerData.power, powerData.timestamp]); // Add timestamp dependency
+  }, [powerData.power, energyData.lastUpdate]);
 
   const resetEnergy = useCallback(() => {
     setEnergyData({
@@ -102,39 +87,24 @@ export function useMQTT() {
     });
   }, []);
 
-  useEffect(() => {
-    console.log('Initializing MQTT connection...');
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+  const connectWebSocket = useCallback(() => {
+    if (!esp32IP) return;
+
+    const wsUrl = `ws://${esp32IP}/ws`;
+    console.log('Connecting to WebSocket:', wsUrl);
     setConnectionStatus(prev => ({ ...prev, connecting: true }));
 
     try {
-      const client = mqtt.connect(MQTT_BROKER, {
-        clean: true,
-        connectTimeout: 4000,
-        reconnectPeriod: 1000,
-      });
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
 
-      clientRef.current = client;
-
-      client.on('connect', () => {
-        console.log('Connected to MQTT broker');
+      ws.onopen = () => {
+        console.log('WebSocket connected');
         connectionTimeRef.current = Date.now();
-        
         setConnectionStatus({
           connected: true,
           connecting: false,
           error: null,
-        });
-
-        // Subscribe to all topics
-        Object.values(TOPICS).forEach(topic => {
-          client.subscribe(topic, (err) => {
-            if (err) {
-              console.error(`Failed to subscribe to ${topic}:`, err);
-            } else {
-              console.log(`Subscribed to ${topic}`);
-            }
-          });
         });
 
         // Start uptime counter
@@ -144,9 +114,9 @@ export function useMQTT() {
             setSystemStats(prev => ({ ...prev, connectionUptime: uptime }));
           }
         }, 1000);
-      });
+      };
 
-      client.on('message', (topic, message) => {
+      ws.onmessage = (event) => {
         const now = Date.now();
         setSystemStats(prev => ({
           ...prev,
@@ -155,13 +125,15 @@ export function useMQTT() {
         }));
 
         try {
-          const payload = message.toString();
+          const message = JSON.parse(event.data);
+          const topic = message.topic;
+          const payload = message.payload;
 
           switch (topic) {
             case TOPICS.TEMP_1:
               setTemperatureData(prev => ({
                 ...prev,
-                t1: parseFloat(payload),
+                t1: typeof payload === 'string' ? parseFloat(payload) : payload,
                 timestamp: now,
               }));
               break;
@@ -169,7 +141,7 @@ export function useMQTT() {
             case TOPICS.TEMP_2:
               setTemperatureData(prev => ({
                 ...prev,
-                t2: parseFloat(payload),
+                t2: typeof payload === 'string' ? parseFloat(payload) : payload,
                 timestamp: now,
               }));
               break;
@@ -177,13 +149,13 @@ export function useMQTT() {
             case TOPICS.TEMP_3:
               setTemperatureData(prev => ({
                 ...prev,
-                t3: parseFloat(payload),
+                t3: typeof payload === 'string' ? parseFloat(payload) : payload,
                 timestamp: now,
               }));
               break;
 
             case TOPICS.POWER:
-              const powerJson = JSON.parse(payload);
+              const powerJson = typeof payload === 'string' ? JSON.parse(payload) : payload;
               setPowerData({
                 voltage: powerJson.voltage || 0,
                 current: powerJson.current || 0,
@@ -193,9 +165,9 @@ export function useMQTT() {
               break;
 
             case TOPICS.FFT:
-              const fftJson = JSON.parse(payload);
+              const fftJson = typeof payload === 'string' ? JSON.parse(payload) : payload;
               setFFTData({
-                fs: fftJson.fs || 3200,
+                fs: fftJson.fs || 800,
                 bins: fftJson.bins || [],
                 peak: fftJson.peak || 0,
                 timestamp: now,
@@ -205,9 +177,9 @@ export function useMQTT() {
                 fftUpdates: prev.fftUpdates + 1,
               }));
               break;
-            
+
             case TOPICS.TILT:
-              const tiltJson = JSON.parse(payload);
+              const tiltJson = typeof payload === 'string' ? JSON.parse(payload) : payload;
               setTiltData({
                 pitch: tiltJson.pitch || 0,
                 roll: tiltJson.roll || 0,
@@ -219,52 +191,61 @@ export function useMQTT() {
               break;
           }
         } catch (error) {
-          console.error(`Error parsing message from ${topic}:`, error);
+          console.error('Error parsing WebSocket message:', error);
         }
-      });
+      };
 
-      client.on('error', (error) => {
-        console.error('MQTT Error:', error);
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
         setConnectionStatus({
           connected: false,
           connecting: false,
-          error: error.message,
+          error: 'Connection error',
         });
-      });
+      };
 
-      client.on('reconnect', () => {
-        console.log('Reconnecting to MQTT broker...');
-        setConnectionStatus(prev => ({ ...prev, connecting: true }));
-      });
-
-      client.on('disconnect', () => {
-        console.log('Disconnected from MQTT broker');
+      ws.onclose = () => {
+        console.log('WebSocket disconnected');
         setConnectionStatus({
           connected: false,
           connecting: false,
           error: 'Disconnected',
         });
-      });
 
+        if (uptimeIntervalRef.current) {
+          clearInterval(uptimeIntervalRef.current);
+        }
+
+        // Attempt reconnection after 2 seconds
+        reconnectTimeoutRef.current = setTimeout(() => {
+          connectWebSocket();
+        }, 2000);
+      };
     } catch (error) {
-      console.error('Failed to initialize MQTT client:', error);
+      console.error('Failed to create WebSocket:', error);
       setConnectionStatus({
         connected: false,
         connecting: false,
         error: error instanceof Error ? error.message : 'Unknown error',
       });
     }
+  }, [esp32IP]);
 
-    // Cleanup
+  useEffect(() => {
+    connectWebSocket();
+
     return () => {
       if (uptimeIntervalRef.current) {
         clearInterval(uptimeIntervalRef.current);
       }
-      if (clientRef.current) {
-        clientRef.current.end();
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+      if (wsRef.current) {
+        wsRef.current.close();
       }
     };
-  }, []);
+  }, [connectWebSocket]);
 
   return {
     connectionStatus,
@@ -274,6 +255,6 @@ export function useMQTT() {
     energyData,
     systemStats,
     resetEnergy,
-    tiltData
+    tiltData,
   };
 }

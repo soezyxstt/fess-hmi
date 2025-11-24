@@ -13,7 +13,7 @@ import {
 } from '@/types/sensor-data';
 
 const MQTT_BROKER = process.env.NODE_ENV === 'production'
-  ? 'wss://broker.iot.hmmitb.com:8884'
+  ? 'wss://broker.iot.hmmitb.com'
   : 'ws://broker.iot.hmmitb.com:1884';
 
 const TOPICS = {

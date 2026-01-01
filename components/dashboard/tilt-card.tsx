@@ -1,135 +1,112 @@
-// components/dashboard/TiltCard.tsx
 'use client';
 
+import { Canvas } from '@react-three/fiber';
+import { OrbitControls, PerspectiveCamera, Environment, Float } from '@react-three/drei';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TiltData } from '@/types/sensor-data';
-import { Move, ArrowUp, ArrowRight } from 'lucide-react';
+import { Activity, Move3d } from 'lucide-react';
+import { Suspense } from 'react';
+
+// --- 3D Components ---
+
+function GroundPlane() {
+  return (
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -2, 0]}>
+      <planeGeometry args={[20, 20]} />
+      <meshStandardMaterial color="#f1f5f9" opacity={0.5} transparent />
+      <gridHelper args={[20, 20, 0xcbd5e1, 0xe2e8f0]} />
+    </mesh>
+  );
+}
+
+function TiltingPlatform({ pitch, roll }: { pitch: number; roll: number }) {
+  // Convert degrees to radians
+  const pitchRad = (pitch * Math.PI) / 180;
+  const rollRad = (roll * Math.PI) / 180;
+
+  return (
+    <group rotation={[pitchRad, 0, -rollRad]}>
+      {/* The "Table" or Device Body */}
+      <mesh receiveShadow castShadow>
+        <boxGeometry args={[3, 0.2, 3]} />
+        <meshStandardMaterial color="#334155" roughness={0.2} metalness={0.8} />
+      </mesh>
+
+      {/* Axis Indicators */}
+      {/* X Axis (Roll) - Red */}
+      <mesh position={[1.8, 0, 0]}>
+        <boxGeometry args={[0.5, 0.05, 0.05]} />
+        <meshBasicMaterial color="#ef4444" />
+      </mesh>
+
+      {/* Z Axis (Pitch) - Blue */}
+      <mesh position={[0, 0, 1.8]}>
+        <boxGeometry args={[0.05, 0.05, 0.5]} />
+        <meshBasicMaterial color="#3b82f6" />
+      </mesh>
+
+      {/* Center Marker */}
+      <mesh position={[0, 0.2, 0]}>
+        <cylinderGeometry args={[0.2, 0.2, 0.1, 32]} />
+        <meshStandardMaterial color="#fbbf24" emissive="#fbbf24" emissiveIntensity={0.5} />
+      </mesh>
+    </group>
+  );
+}
+
+// --- Main Component ---
 
 interface TiltCardProps {
   data: TiltData | null;
 }
 
 export function TiltCard({ data }: TiltCardProps) {
-  if (!data) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Move className="h-5 w-5" />
-            Tilt Angle
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-center h-48 text-muted-foreground">
-            Waiting for tilt data...
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  // Determine tilt severity colors
-  const getPitchColor = (pitch: number) => {
-    const abs = Math.abs(pitch);
-    if (abs > 30) return 'text-red-500';
-    if (abs > 15) return 'text-orange-500';
-    return 'text-green-400';
-  };
-
-  const getRollColor = (roll: number) => {
-    const abs = Math.abs(roll);
-    if (abs > 30) return 'text-red-500';
-    if (abs > 15) return 'text-orange-500';
-    return 'text-green-400';
-  };
-
-  // Calculate total tilt magnitude
-  const totalTilt = Math.sqrt(data.pitch * data.pitch + data.roll * data.roll);
+  const pitch = data?.pitch || 0;
+  const roll = data?.roll || 0;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Move className="h-5 w-5" />
-          Tilt Angle
+    // ADDED: h-full and flex-col to force the card to fill the parent grid cell
+    <Card className="h-full flex flex-col shadow-sm border-border bg-card">
+      <CardHeader className="py-3 px-4 border-b border-border bg-muted/20 flex-none">
+        <CardTitle className="text-sm font-semibold flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Move3d className="w-4 h-4 text-primary" />
+            <span>Live Tilt</span>
+          </div>
+          <div className="flex gap-3 text-xs font-mono text-muted-foreground">
+            <span>P: <strong className="text-foreground">{pitch.toFixed(1)}°</strong></span>
+            <span>R: <strong className="text-foreground">{roll.toFixed(1)}°</strong></span>
+          </div>
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-6">
-          {/* Visual Tilt Indicator */}
-          <div className="relative w-full h-48 bg-secondary rounded-lg flex items-center justify-center overflow-hidden">
-            {/* Center reference */}
-            <div className="absolute w-2 h-2 bg-primary rounded-full z-10"></div>
 
-            {/* Tilt ball */}
-            <div
-              className="absolute w-8 h-8 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full shadow-lg transition-all duration-300"
-              style={{
-                transform: `translate(${data.roll * 2}px, ${data.pitch * 2}px)`,
-              }}
-            ></div>
+      {/* ADDED: flex-1 relative min-h-[200px] to force expansion */}
+      <CardContent className="p-0 flex-1 relative min-h-[200px] w-full bg-slate-50/50 dark:bg-slate-900/50">
+        <div className="absolute inset-0">
+          <Canvas shadows dpr={[1, 2]}>
+            <PerspectiveCamera makeDefault position={[0, 3, 6]} fov={50} />
+            <OrbitControls enableZoom={false} enablePan={false} minPolarAngle={0} maxPolarAngle={Math.PI / 2.5} />
 
-            {/* Grid lines */}
-            <div className="absolute w-full h-px bg-border top-1/2"></div>
-            <div className="absolute h-full w-px bg-border left-1/2"></div>
-          </div>
+            <ambientLight intensity={0.5} />
+            <spotLight position={[5, 10, 5]} angle={0.15} penumbra={1} intensity={1000} castShadow />
+            <pointLight position={[-10, -10, -10]} intensity={500} />
 
-          {/* Angle Values */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <ArrowUp className="h-4 w-4" />
-                <span>Pitch (Y-axis)</span>
-              </div>
-              <p className={`text-3xl font-bold ${getPitchColor(data.pitch)}`}>
-                {data.pitch.toFixed(1)}°
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {data.pitch > 0 ? 'Forward' : data.pitch < 0 ? 'Backward' : 'Level'}
-              </p>
+            <Environment preset="city" />
+
+            <Suspense fallback={null}>
+              <Float speed={2} rotationIntensity={0.2} floatIntensity={0.2}>
+                <TiltingPlatform pitch={pitch} roll={roll} />
+              </Float>
+              <GroundPlane />
+            </Suspense>
+          </Canvas>
+
+          {/* Optional: Overlay Text for Context */}
+          <div className="absolute bottom-2 left-2 pointer-events-none">
+            <div className="flex items-center gap-1 text-[10px] text-muted-foreground bg-background/80 backdrop-blur px-2 py-1 rounded border border-border">
+              <Activity className="w-3 h-3" />
+              <span>Real-time ADXL345 feed</span>
             </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <ArrowRight className="h-4 w-4" />
-                <span>Roll (X-axis)</span>
-              </div>
-              <p className={`text-3xl font-bold ${getRollColor(data.roll)}`}>
-                {data.roll.toFixed(1)}°
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {data.roll > 0 ? 'Right' : data.roll < 0 ? 'Left' : 'Level'}
-              </p>
-            </div>
-          </div>
-
-          {/* Total Tilt */}
-          <div className="pt-4 border-t">
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">Total Tilt</span>
-              <span className="text-lg font-bold text-primary">
-                {totalTilt.toFixed(1)}°
-              </span>
-            </div>
-          </div>
-
-          {/* Status Indicator */}
-          <div className="text-center">
-            {totalTilt < 5 && (
-              <span className="text-sm px-3 py-1 bg-green-500/20 text-green-400 rounded-full">
-                ✓ Level
-              </span>
-            )}
-            {totalTilt >= 5 && totalTilt < 20 && (
-              <span className="text-sm px-3 py-1 bg-orange-500/20 text-orange-400 rounded-full">
-                ⚠ Slight Tilt
-              </span>
-            )}
-            {totalTilt >= 20 && (
-              <span className="text-sm px-3 py-1 bg-red-500/20 text-red-400 rounded-full">
-                ⚠ Significant Tilt
-              </span>
-            )}
           </div>
         </div>
       </CardContent>

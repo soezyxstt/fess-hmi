@@ -14,35 +14,53 @@ export interface TiltData {
   timestamp: number;
 }
 
+export interface RPMData {
+  value: number;
+  timestamp: number;
+}
 
-export interface PowerData {
-  voltage: number;
-  current: number;
-  power: number;
+export interface DualPowerData {
+  input: {
+    voltage: number;
+    current: number;
+    power: number;
+  };
+  output: {
+    voltage: number;
+    current: number;
+    power: number;
+  };
+  efficiency: number; // Calculated percentage (0-100)
+  timestamp: number;
+}
+
+export interface MechanicalHealth {
+  alignmentUpper: number; // Load Cell Top (Newtons)
+  alignmentLower: number; // Load Cell Bottom (Newtons)
+  isCompressorOn: boolean; // Active Cooling Status
   timestamp: number;
 }
 
 export interface FFTBin {
-  f: number; // frequency in Hz
-  m: number; // magnitude
+  f: number; // Frequency
+  m: number; // Magnitude
 }
 
-export interface FFTData {
-  fs: number; // sampling frequency
-  bins: FFTBin[];
-  peak: number; // dominant frequency
-  timestamp: number;
+export interface SingleFFTData {
+  fs: number;          // Sampling Frequency
+  bins: FFTBin[];      // Spectrum Bins
+  peak: number;        // Peak Frequency (Hz)
+  peakAmplitude?: number; // Peak Magnitude (g/m/s²) - Optional calculated field
 }
 
-export interface VibrationData {
-  x: number;
-  y: number;
-  z: number;
+export interface DualFFTData {
+  sensor1: SingleFFTData | null; // Upper Sensor
+  sensor2: SingleFFTData | null; // Lower Sensor
   timestamp: number;
 }
 
 export interface EnergyData {
-  totalEnergy: number; // in Wh
+  totalEnergy: number; // Wh
   lastUpdate: number;
 }
 

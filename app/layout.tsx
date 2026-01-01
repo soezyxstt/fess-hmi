@@ -5,8 +5,8 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "EONCORE HMI",
-  description: "Real-time monitoring system for Flywheel Energy Storage System by Group 1 K01 PPPR",
+  title: "ARES HMI",
+  description: "Real-time monitoring system for Flywheel Energy Storage System",
 };
 
 export default function RootLayout({

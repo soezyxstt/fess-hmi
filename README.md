@@ -1,36 +1,67 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ARES Monitor — FESS HMI
 
-## Getting Started
+Real-time monitoring and diagnostic HMI for a **flywheel energy storage system (FESS)**.
 
-First, run the development server:
+The application receives live machine telemetry over MQTT, visualizes electrical and mechanical operating conditions, performs vibration diagnostics, and exposes deeper views for FFT analysis and a 3D digital twin.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Engineering highlights
+
+- Live MQTT telemetry from the physical system
+- Flywheel RPM, input/output power, energy, temperature, and alignment monitoring
+- Vibration-health analysis using FFT-derived features
+- Alert states for abnormal mechanical vibration
+- 3D machine visualization with React Three Fiber
+- Dedicated spectral-analysis view
+- Persistent data layer using PostgreSQL + Drizzle
+- Browser-based industrial dashboard designed for fast operator inspection
+
+## Stack
+
+- **Next.js 16**
+- **React 19 + TypeScript**
+- **MQTT.js**
+- **React Three Fiber / Drei / Three.js**
+- **Recharts**
+- **PostgreSQL + Drizzle ORM**
+- **Tailwind CSS**
+
+## High-level architecture
+
+```text
+Sensors / FESS hardware
+        │
+        │ telemetry
+        ▼
+      MQTT
+        │
+        ▼
+ARES Monitor
+ ├─ Live operational dashboard
+ ├─ Vibration diagnostics
+ ├─ FFT / spectral analysis
+ ├─ 3D digital twin
+ └─ Historical data persistence
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Main monitored domains
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- Rotational speed
+- Charging / discharging power
+- Energy accumulation
+- Thermal condition
+- Mechanical alignment
+- Tilt
+- Vibration spectra and fault indicators
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Local development
 
-## Learn More
+Configure the MQTT and database environment variables, then run:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm install
+npm run dev
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Project context
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+This project demonstrates the intersection of mechanical systems, condition monitoring, IIoT, and full-stack software engineering.

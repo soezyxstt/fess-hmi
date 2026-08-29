@@ -55,12 +55,15 @@ ARES Monitor
 
 ## Local development
 
-Configure the MQTT and database environment variables, then run:
+Create `.env` from the provided template and configure the PostgreSQL connection:
 
 ```bash
+cp .env.example .env
 npm install
 npm run dev
 ```
+
+The MQTT endpoint used by the current hardware setup is defined in `hooks/useMQTT.ts`.
 
 ## Project context
 
